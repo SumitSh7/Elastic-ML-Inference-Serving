@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import argparse
 import itertools
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import time
 
 import requests
+
+
+def _send_request(endpoint: str, image_path: Path) -> None:
+    with image_path.open("rb") as image_file:
+        response = requests.post(endpoint, files={"image": image_file}, timeout=5)
+    response.raise_for_status()
 
 
 def run_load_test(endpoint: str, image_dir: Path, rps_pattern: list[int], duration_s: int) -> None:
@@ -20,13 +27,13 @@ def run_load_test(endpoint: str, image_dir: Path, rps_pattern: list[int], durati
     while time.time() - start < duration_s:
         rps = rps_pattern[second % len(rps_pattern)]
         tick_start = time.time()
-        for _ in range(rps):
-            image_path = next(cycle)
-            with image_path.open("rb") as image_file:
-                response = requests.post(endpoint, files={"image": image_file}, timeout=5)
-            response.raise_for_status()
-        second += 1
 
+        with ThreadPoolExecutor(max_workers=max(1, rps)) as executor:
+            futures = [executor.submit(_send_request, endpoint, next(cycle)) for _ in range(rps)]
+            for future in as_completed(futures):
+                future.result()
+
+        second += 1
         elapsed = time.time() - tick_start
         if elapsed < 1.0:
             time.sleep(1.0 - elapsed)

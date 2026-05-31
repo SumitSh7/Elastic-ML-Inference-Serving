@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 import time
 from typing import Any
@@ -101,18 +102,19 @@ class Dispatcher:
             await self._set_replicas(desired)
 
 
-app = FastAPI(title="Elastic ML Inference Serving")
 dispatcher = Dispatcher(initial_replicas=1)
 
 
-@app.on_event("startup")
-async def startup() -> None:
+@asynccontextmanager
+async def lifespan(_: FastAPI):
     await dispatcher.start()
+    try:
+        yield
+    finally:
+        await dispatcher.stop()
 
 
-@app.on_event("shutdown")
-async def shutdown() -> None:
-    await dispatcher.stop()
+app = FastAPI(title="Elastic ML Inference Serving", lifespan=lifespan)
 
 
 @app.post("/predict")
