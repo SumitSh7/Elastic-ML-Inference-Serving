@@ -28,16 +28,26 @@ class InferenceTask:
     response_queue: asyncio.Queue
 
 
+DEFAULT_LATENCY_WINDOW_SIZE = 300
+DEFAULT_AUTOSCALE_INTERVAL_S = 15
+
+
 class Dispatcher:
-    def __init__(self, initial_replicas: int = 1) -> None:
+    def __init__(
+        self,
+        initial_replicas: int = 1,
+        latency_window_size: int = DEFAULT_LATENCY_WINDOW_SIZE,
+        autoscale_interval_s: int = DEFAULT_AUTOSCALE_INTERVAL_S,
+    ) -> None:
         self.queue: asyncio.Queue[InferenceTask] = asyncio.Queue()
         self._workers: list[asyncio.Task[Any]] = []
-        self._latency_window: deque[float] = deque(maxlen=300)
+        self._latency_window: deque[float] = deque(maxlen=latency_window_size)
         self._autoscaler = Autoscaler()
         self._service = ResNet18Service()
         self._lock = asyncio.Lock()
         self._loop_task: asyncio.Task[Any] | None = None
         self._initial_replicas = initial_replicas
+        self._autoscale_interval_s = autoscale_interval_s
 
     async def start(self) -> None:
         await self._set_replicas(self._initial_replicas)
@@ -93,7 +103,7 @@ class Dispatcher:
 
     async def _autoscale_loop(self) -> None:
         while True:
-            await asyncio.sleep(15)
+            await asyncio.sleep(self._autoscale_interval_s)
             desired = self._autoscaler.desired_replicas(
                 current_replicas=len(self._workers),
                 p95_latency_s=self._p95_latency(),

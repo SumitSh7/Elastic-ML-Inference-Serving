@@ -8,6 +8,7 @@ class AutoscalerConfig:
     target_latency_s: float = 0.5
     scale_up_step: int = 1
     scale_down_step: int = 1
+    scale_down_latency_ratio: float = 0.5
 
 
 class Autoscaler:
@@ -23,7 +24,7 @@ class Autoscaler:
         if queue_depth > replicas or p95_latency_s > self.config.target_latency_s:
             return self._bounded(replicas + self.config.scale_up_step)
 
-        low_latency_threshold = self.config.target_latency_s * 0.5
+        low_latency_threshold = self.config.target_latency_s * self.config.scale_down_latency_ratio
         if queue_depth == 0 and p95_latency_s <= low_latency_threshold:
             return self._bounded(replicas - self.config.scale_down_step)
 
