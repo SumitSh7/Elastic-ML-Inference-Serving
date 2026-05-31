@@ -21,6 +21,13 @@ class AutoscalerTests(unittest.TestCase):
     def test_holds_when_within_target(self) -> None:
         self.assertEqual(self.autoscaler.desired_replicas(2, p95_latency_s=0.3, queue_depth=1), 2)
 
+    def test_does_not_scale_down_without_latency_samples(self) -> None:
+        self.assertEqual(self.autoscaler.desired_replicas(3, p95_latency_s=0.0, queue_depth=0), 3)
+
+    def test_enforces_min_and_max_replicas(self) -> None:
+        self.assertEqual(self.autoscaler.desired_replicas(4, p95_latency_s=0.9, queue_depth=10), 4)
+        self.assertEqual(self.autoscaler.desired_replicas(1, p95_latency_s=0.1, queue_depth=0), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

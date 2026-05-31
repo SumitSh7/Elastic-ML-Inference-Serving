@@ -25,7 +25,7 @@ class Autoscaler:
             return self._bounded(replicas + self.config.scale_up_step)
 
         low_latency_threshold = self.config.target_latency_s * self.config.scale_down_latency_ratio
-        if queue_depth == 0 and p95_latency_s <= low_latency_threshold:
+        if queue_depth == 0 and p95_latency_s > 0 and p95_latency_s <= low_latency_threshold:
             return self._bounded(replicas - self.config.scale_down_step)
 
         return replicas
